@@ -1,7 +1,7 @@
 const { smartClick } = require("../utils/click");
 
 async function clickSearchButton(page) {
-  console.log("🔍 [김금돌] 검색 및 등록 프로세스를 시작합니다...");
+  console.log("🔍 [test.js] 검색 및 등록 프로세스 자동 시작...");
 
   const frames = page.frames();
   let workFrame = null;
@@ -17,14 +17,14 @@ async function clickSearchButton(page) {
   }
 
   if (!workFrame) {
-    console.error("❌ 작업 프레임을 찾을 수 없습니다.");
+    console.error("❌ [test.js] 작업 프레임을 찾을 수 없습니다.");
     return;
   }
 
   // ---------------------------------------------------------
-  // [NEW STEP] 유효 체크박스 체크
+  // [STEP 0] 유효 체크박스 체크
   // ---------------------------------------------------------
-  console.log("✅ '유효' 체크박스를 클릭합니다.");
+  console.log("✅ '유효' 체크박스 자동 활성화");
   const validCheckbox = await workFrame.$(
     'xpath///div[contains(@id, "chk_validCtr")]'
   );
@@ -81,26 +81,24 @@ async function clickSearchButton(page) {
   if (allRows.length > 0) {
     const lastRow = allRows[allRows.length - 1];
     await smartClick(page, workFrame, lastRow);
-    console.log("✅ 마지막 행(김금돌) 선택 완료");
+    console.log("✅ 대상자(김금돌) 행 선택 완료");
     await new Promise((r) => setTimeout(r, 1000));
   }
 
   // ---------------------------------------------------------
-  // [STEP 5] 급여계약내용 등록 버튼 클릭 (신규 추가)
+  // [STEP 5] 급여계약내용 등록 버튼 클릭
   // ---------------------------------------------------------
-  console.log("📝 [급여계약내용 등록] 버튼을 클릭합니다.");
+  console.log("📝 [급여계약내용 등록] 버튼 자동 클릭...");
   const registerButton = await workFrame.$(
     'xpath///div[contains(@id, "btn_regPaymtContnNtct")]'
   );
 
   if (registerButton) {
-    // 버튼 클릭
     await smartClick(page, workFrame, registerButton);
     console.log("🚀 등록 화면으로 진입합니다.");
 
-    // 화면 전환 또는 팝업 로딩 대기
+    // 💡 불필요한 스크린샷 코드 제거 완료
     await new Promise((r) => setTimeout(r, 2000));
-    await page.screenshot({ path: "registration_page.png" });
   } else {
     console.error("❌ [급여계약내용 등록] 버튼을 찾을 수 없습니다.");
   }
