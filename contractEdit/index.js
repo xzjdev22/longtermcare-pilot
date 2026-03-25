@@ -1,7 +1,7 @@
-const readline = require("readline");
 /**
  * [index.js] 급여계약내용 등록 자동화 메인 컨트롤러
  */
+const { ask, closeInterface } = require("../utils/readline"); // utils/readline 활용
 const { smartClick } = require("../utils/click");
 const { clickSearchButton } = require("./process1_search"); // [Step 1] 대상자 조회 및 메뉴 진입
 const { fillRegistrationDetails } = require("./process2_init"); // [Step 2] 년월 선택 및 입력 모드 활성화
@@ -13,11 +13,7 @@ const { selectServiceDays } = require("./process7_calendar"); // [Step 7] 날짜
 const { finalizeRegistration } = require("./process8_finalize"); // [Step 8] 최종 저장 및 팝업 지연 처리
 
 async function runContractEdit(page) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const ask = (q) => new Promise((res) => rl.question(q, res));
+  // [삭제] 여기서 직접 rl을 생성하지 않고 utils의 ask를 사용합니다.
 
   console.log("\n====================================================");
   console.log("🚀 [Longterm-Bot] 비즈니스 로직 자동화 공정 시작");
@@ -45,6 +41,7 @@ async function runContractEdit(page) {
     if (!menuElement)
       throw new Error("'급여계약내용 등록변경해지' 메뉴를 찾을 수 없습니다.");
 
+    // 메뉴 클릭 및 로딩 대기
     await smartClick(page, menuFrame, menuElement);
     console.log("⏳ 메뉴 로딩 대기 (3초)...");
     await new Promise((r) => setTimeout(r, 3000));
@@ -58,6 +55,7 @@ async function runContractEdit(page) {
     while (addMore) {
       await selectMultiplePersons(page);
 
+      // utils에서 불러온 ask를 그대로 사용합니다.
       await inputServiceTime(page, ask);
 
       await selectComboItem(page);
@@ -72,6 +70,7 @@ async function runContractEdit(page) {
     }
 
     // [PHASE C] 날짜 확정 및 최종 저장
+    // [중요] process7_calendar 내부에서도 utils/readline의 ask를 사용하도록 수정해야 합니다.
     await selectServiceDays(page);
     await finalizeRegistration(page);
 
@@ -83,8 +82,8 @@ async function runContractEdit(page) {
     console.error(`❌ [CRITICAL ERROR] 프로세스 중단: ${error.message}`);
     console.log("----------------------------------------------------\n");
   } finally {
-    // 모든 과정이 끝난 후 한 번만 닫습니다.
-    rl.close();
+    // 모든 과정이 끝난 후 유틸리티를 통해 한 번만 닫습니다.
+    closeInterface();
   }
 }
 
