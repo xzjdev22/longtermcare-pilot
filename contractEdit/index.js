@@ -1,3 +1,4 @@
+const readline = require("readline");
 /**
  * [index.js] 급여계약내용 등록 자동화 메인 컨트롤러
  */
@@ -12,20 +13,21 @@ const { selectServiceDays } = require("./process7_calendar"); // [Step 7] 날짜
 const { finalizeRegistration } = require("./process8_finalize"); // [Step 8] 최종 저장 및 팝업 지연 처리
 
 async function runContractEdit(page) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const ask = (q) => new Promise((res) => rl.question(q, res));
+
   console.log("\n====================================================");
   console.log("🚀 [Longterm-Bot] 비즈니스 로직 자동화 공정 시작");
   console.log("====================================================");
 
   try {
-    // ---------------------------------------------------------
-    // [GATEWAY] 메뉴 진입 로직 (복원)
-    // ---------------------------------------------------------
+    // [GATEWAY] 메뉴 진입 로직
     console.log("📋 [급여계약내용] 메뉴 진입 시도...");
-
     let menuElement = null;
     let menuFrame = null;
-
-    // 모든 프레임을 뒤져서 메뉴 텍스트를 찾음
     for (const frame of page.frames()) {
       try {
         const elements = await frame.$$(
@@ -40,37 +42,38 @@ async function runContractEdit(page) {
         continue;
       }
     }
+    if (!menuElement)
+      throw new Error("'급여계약내용 등록변경해지' 메뉴를 찾을 수 없습니다.");
 
-    if (!menuElement) {
-      throw new Error(
-        "'급여계약내용 등록변경해지' 메뉴를 찾을 수 없습니다. 현재 화면을 확인하세요."
-      );
-    }
-
-    // 메뉴 클릭 및 로딩 대기
     await smartClick(page, menuFrame, menuElement);
     console.log("⏳ 메뉴 로딩 대기 (3초)...");
     await new Promise((r) => setTimeout(r, 3000));
 
-    // ---------------------------------------------------------
     // [PHASE A] 기초 조회 및 환경 설정
-    // ---------------------------------------------------------
-    await clickSearchButton(page); // Step 1
-    await fillRegistrationDetails(page); // Step 2
+    await clickSearchButton(page);
+    await fillRegistrationDetails(page);
 
-    // ---------------------------------------------------------
-    // [PHASE B] 상세 데이터 입력 및 구성
-    // ---------------------------------------------------------
-    await selectMultiplePersons(page); // Step 3
-    await inputServiceTime(page); // Step 4
-    await selectComboItem(page); // Step 5
-    await finalizeInput(page); // Step 6
+    // [PHASE B] 상세 데이터 입력 및 구성 (루프 적용) 🔄
+    let addMore = true;
+    while (addMore) {
+      await selectMultiplePersons(page);
 
-    // ---------------------------------------------------------
+      await inputServiceTime(page, ask);
+
+      await selectComboItem(page);
+      await finalizeInput(page);
+
+      console.log("\n-------------------------------------------");
+      const answer = await ask("❓ 추가로 입력할 시간대가 있습니까? (y/n): ");
+      if (answer.toLowerCase() !== "y") {
+        addMore = false;
+      }
+      console.log("-------------------------------------------");
+    }
+
     // [PHASE C] 날짜 확정 및 최종 저장
-    // ---------------------------------------------------------
-    await selectServiceDays(page); // Step 7
-    await finalizeRegistration(page); // Step 8
+    await selectServiceDays(page);
+    await finalizeRegistration(page);
 
     console.log("\n====================================================");
     console.log("🎊 [SUCCESS] 모든 비즈니스 프로세스가 정상 종료되었습니다.");
@@ -79,6 +82,9 @@ async function runContractEdit(page) {
     console.log("\n----------------------------------------------------");
     console.error(`❌ [CRITICAL ERROR] 프로세스 중단: ${error.message}`);
     console.log("----------------------------------------------------\n");
+  } finally {
+    // 모든 과정이 끝난 후 한 번만 닫습니다.
+    rl.close();
   }
 }
 
