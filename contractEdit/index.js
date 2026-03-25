@@ -1,10 +1,12 @@
 const { smartClick } = require("../utils/click");
-const { clickSearchButton } = require("./test");
-const { fillRegistrationDetails } = require("./test2"); // 날짜선택 + 조회 + 입력클릭
-const { selectMultiplePersons } = require("./test3"); // 두 명 선택 + 추가(화살표)클릭
-const { inputServiceTime } = require("./test4"); // 원복된 시간 입력
-const { selectComboItem } = require("./test5"); // 새로 분리한 콤보박스 선택
+const { clickSearchButton } = require("./test"); // STEP 1: 조회 및 등록 진입
+const { fillRegistrationDetails } = require("./test2"); // STEP 2: 날짜선택 + 조회 + 입력클릭
+const { selectMultiplePersons } = require("./test3"); // STEP 3: 대상자 선택 + 추가 클릭
+const { inputServiceTime } = require("./test4"); // STEP 4: 시간 입력
+const { selectComboItem } = require("./test5"); // STEP 5: 서비스 방법 선택
 const { finalizeInput } = require("./test6"); // 추가
+const { selectServiceDays } = require("./test7"); // STEP 7 (날짜 선택)
+const { finalizeRegistration } = require("./test8"); // STEP 8 (최종 저장)
 
 /**
  * 급여계약내용 등록 메인 프로세스
@@ -50,10 +52,18 @@ async function runContractEdit(page) {
     // [STEP 5] 서비스 방법(차량내 목욕 등) 콤보 선택
     await selectComboItem(page);
 
-    // [STEP 6] 최종 [입력] 버튼 클릭 🎯
+    // [STEP 6] 중간 [입력] 버튼 클릭 (그리드 반영)
     await finalizeInput(page);
 
-    console.log("📍 [급여계약내용] 메뉴 내 모든 자동화 단계가 완료되었습니다.");
+    // 🎯 [STEP 7] 날짜 선택 (2026년 4월 기준 체크박스 클릭)
+    await selectServiceDays(page);
+
+    // [STEP 8] 🎯 최종 [저장 및 통보] 버튼 클릭 (DB 실제 저장)
+    await finalizeRegistration(page);
+
+    console.log(
+      "🏁 [longtermcare-pilot] 모든 자동화 공정이 성공적으로 종료되었습니다."
+    );
   } else {
     console.error("❌ 메뉴 요소를 찾을 수 없습니다.");
   }
