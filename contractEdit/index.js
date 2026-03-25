@@ -48,11 +48,16 @@ async function runContractEdit(page) {
 
     // [PHASE A] 기초 조회 및 환경 설정
     await clickSearchButton(page);
-    await fillRegistrationDetails(page);
+    await fillRegistrationDetails(page); // 이제 이 안에서는 조회까지만 수행합니다.
 
     // [PHASE B] 상세 데이터 입력 및 구성 (루프 적용) 🔄
     let addMore = true;
     while (addMore) {
+      console.log("\n➕ 새로운 서비스 행 추가 및 데이터 작성을 시작합니다.");
+
+      // [추가] PHASE B의 시작점: [입력] 버튼을 클릭하여 새 행을 만듭니다.
+      await addNewRow(page);
+
       await selectMultiplePersons(page);
 
       // utils에서 불러온 ask를 그대로 사용합니다.
@@ -84,6 +89,50 @@ async function runContractEdit(page) {
   } finally {
     // 모든 과정이 끝난 후 유틸리티를 통해 한 번만 닫습니다.
     closeInterface();
+  }
+}
+
+/**
+ * PHASE B의 첫 번째 액션: [입력] 버튼 클릭 (기존 process2_init의 로직 계승)
+ */
+async function addNewRow(page) {
+  const frames = page.frames();
+  let workFrame = frames.find(
+    (f) =>
+      f.name().includes("framesetWork") || f.name().includes("winNPA03020000")
+  );
+
+  // 기존 프레임 탐색 로직 유지
+  if (!workFrame) {
+    for (const frame of frames) {
+      try {
+        if (await frame.$('xpath///div[contains(@id, "npia107p01")]')) {
+          workFrame = frame;
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+
+  if (!workFrame)
+    throw new Error("❌ [행 추가] 메인 작업 프레임을 찾을 수 없습니다.");
+
+  console.log("📝 [입력] 버튼 클릭 시도...");
+  const addBtnSelector =
+    'xpath///div[contains(@id, "btn_addRow")]//div[text()="입력"]';
+
+  try {
+    await workFrame.waitForSelector(addBtnSelector, { timeout: 5000 });
+    const addBtn = await workFrame.$(addBtnSelector);
+    if (addBtn) {
+      await smartClick(page, workFrame, addBtn);
+      console.log("✅ [입력] 버튼 클릭 성공 (새 행 추가됨)");
+      await new Promise((r) => setTimeout(r, 1500)); // 행 생성 후 렌더링 대기
+    }
+  } catch (btnErr) {
+    console.error("❌ [입력] 버튼을 찾을 수 없습니다.");
   }
 }
 
