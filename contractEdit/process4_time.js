@@ -1,4 +1,21 @@
 /**
+ * 시작 시간을 기준으로 60분을 더한 종료 시간을 계산합니다. (HHMM 형식)
+ */
+function add60Minutes(startTimeStr) {
+  const hours = parseInt(startTimeStr.substring(0, 2));
+  const minutes = parseInt(startTimeStr.substring(2, 4));
+
+  const date = new Date();
+  date.setHours(hours);
+  date.setMinutes(minutes + 60); // 60분 추가 (자동으로 시간 올림 처리됨)
+
+  const nextHours = String(date.getHours()).padStart(2, "0");
+  const nextMinutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${nextHours}${nextMinutes}`;
+}
+
+/**
  * 특정 셀에 값을 입력하는 헬퍼
  */
 async function typeInCell(page, frame, selector, value, label) {
@@ -29,13 +46,15 @@ async function typeInCell(page, frame, selector, value, label) {
   return false;
 }
 
-// 인자로 ask를 받습니다.
 async function inputServiceTime(page, ask) {
   console.log("📂 [process4_time.js] 서비스 시간 입력을 시작합니다...");
 
-  // 기존의 readline 생성 코드를 삭제하고 전달받은 ask를 사용합니다.
+  // 시작 시간만 묻습니다.
   const startTime = await ask("▶ 시작 시간 입력 (예: 1100): ");
-  const endTime = await ask("▶ 종료 시간 입력 (예: 1200): ");
+
+  // 60분을 자동으로 더해 종료 시간을 계산합니다.
+  const endTime = add60Minutes(startTime);
+  console.log(`💡 서비스 60분 고정: 종료 시간 [${endTime}] 자동 계산됨`);
 
   const frames = page.frames();
   let workFrame = null;
@@ -62,7 +81,7 @@ async function inputServiceTime(page, ask) {
       'div[id*="grd_choiceEggr.body.gridrow_0.cell_0_11"]';
     await typeInCell(page, workFrame, endTimeSelector, endTime, "종료시간");
 
-    console.log("✅ 시간 입력 프로세스가 완료되었습니다.");
+    console.log(`✅ 시간 입력 완료: ${startTime} ~ ${endTime}`);
   } catch (err) {
     console.error("❌ process4_time.js 실행 중 오류:", err.message);
   }
