@@ -13,11 +13,12 @@ const { selectServiceDays } = require("./process7_calendar"); // [Step 7] 날짜
 const { finalizeRegistration } = require("./process8_finalize"); // [Step 8] 최종 저장 및 팝업 지연 처리
 
 async function runContractEdit(page) {
-  // [삭제] 여기서 직접 rl을 생성하지 않고 utils의 ask를 사용합니다.
-
   console.log("\n====================================================");
   console.log("🚀 [Longterm-Bot] 비즈니스 로직 자동화 공정 시작");
   console.log("====================================================");
+
+  // [추가] 입력된 시간대 정보를 저장할 배열
+  const timeSlots = [];
 
   try {
     // [GATEWAY] 메뉴 진입 로직
@@ -48,20 +49,29 @@ async function runContractEdit(page) {
 
     // [PHASE A] 기초 조회 및 환경 설정
     await clickSearchButton(page);
-    await fillRegistrationDetails(page); // 이제 이 안에서는 조회까지만 수행합니다.
+    await fillRegistrationDetails(page);
 
-    // [PHASE B] 상세 데이터 입력 및 구성 (루프 적용) 🔄
+    // ---------------------------------------------------------
+    // [PHASE B] 상세 데이터 입력 루프 (시간대 정보 수집) 🔄
+    // ---------------------------------------------------------
     let addMore = true;
     while (addMore) {
-      console.log("\n➕ 새로운 서비스 행 추가 및 데이터 작성을 시작합니다.");
+      console.log(
+        `\n➕ [${timeSlots.length + 1}번째] 서비스 행 추가를 시작합니다.`
+      );
 
-      // [추가] PHASE B의 시작점: [입력] 버튼을 클릭하여 새 행을 만듭니다.
       await addNewRow(page);
-
       await selectMultiplePersons(page);
 
-      // utils에서 불러온 ask를 그대로 사용합니다.
-      await inputServiceTime(page, ask);
+      // [수정] inputServiceTime에서 반환된 { startTime, endTime }을 배열에 저장합니다.
+      const timeData = await inputServiceTime(page, ask);
+      if (timeData) {
+        // [수정 포인트 1] 현재 행 번호(rowIdx)를 함께 저장 (0부터 시작)
+        timeSlots.push({
+          ...timeData,
+          rowIdx: timeSlots.length,
+        });
+      }
 
       await selectComboItem(page);
       await finalizeInput(page);
@@ -74,10 +84,40 @@ async function runContractEdit(page) {
       console.log("-------------------------------------------");
     }
 
-    // [PHASE C] 날짜 확정 및 최종 저장
-    // [중요] process7_calendar 내부에서도 utils/readline의 ask를 사용하도록 수정해야 합니다.
-    await selectServiceDays(page);
-    await finalizeRegistration(page);
+    // ---------------------------------------------------------
+    // [PHASE C] 시간대별 날짜 확정 (순차적 질문) 📅
+    // ---------------------------------------------------------
+    if (timeSlots.length > 0) {
+      console.log("\n-------------------------------------------");
+      console.log("📅 입력된 시간대별로 적용할 날짜를 선택합니다.");
+      console.log("-------------------------------------------");
+
+      for (const slot of timeSlots) {
+        const timeLabel = `${slot.startTime} ~ ${slot.endTime}`;
+
+        // [수정 포인트 2] slot 객체 전체가 아닌, slot.rowIdx(숫자)를 전달합니다.
+        await selectServiceDays(page, ask, timeLabel, slot.rowIdx);
+      }
+    }
+
+    // ---------------------------------------------------------
+    // [FINAL PHASE] 최종 검토 및 저장
+    // ---------------------------------------------------------
+    console.log(
+      "\n👀 모든 입력이 완료되었습니다. 화면의 체크 상태를 확인해 주세요."
+    );
+    const finalConfirm = await ask(
+      "❓ 모든 정보가 정상입니까? 최종 저장하시겠습니까? (y/n): "
+    );
+
+    if (
+      finalConfirm.toLowerCase() === "y" ||
+      finalConfirm.toLowerCase() === "yy"
+    ) {
+      await finalizeRegistration(page);
+    } else {
+      console.log("\n🛑 사용자가 저장을 취소했습니다. 프로세스를 종료합니다.");
+    }
 
     console.log("\n====================================================");
     console.log("🎊 [SUCCESS] 모든 비즈니스 프로세스가 정상 종료되었습니다.");
@@ -87,13 +127,12 @@ async function runContractEdit(page) {
     console.error(`❌ [CRITICAL ERROR] 프로세스 중단: ${error.message}`);
     console.log("----------------------------------------------------\n");
   } finally {
-    // 모든 과정이 끝난 후 유틸리티를 통해 한 번만 닫습니다.
     closeInterface();
   }
 }
 
 /**
- * PHASE B의 첫 번째 액션: [입력] 버튼 클릭 (기존 process2_init의 로직 계승)
+ * PHASE B의 첫 번째 액션: [입력] 버튼 클릭 (프레임 탐색 로직 포함)
  */
 async function addNewRow(page) {
   const frames = page.frames();
@@ -102,7 +141,6 @@ async function addNewRow(page) {
       f.name().includes("framesetWork") || f.name().includes("winNPA03020000")
   );
 
-  // 기존 프레임 탐색 로직 유지
   if (!workFrame) {
     for (const frame of frames) {
       try {
@@ -129,7 +167,7 @@ async function addNewRow(page) {
     if (addBtn) {
       await smartClick(page, workFrame, addBtn);
       console.log("✅ [입력] 버튼 클릭 성공 (새 행 추가됨)");
-      await new Promise((r) => setTimeout(r, 1500)); // 행 생성 후 렌더링 대기
+      await new Promise((r) => setTimeout(r, 1500));
     }
   } catch (btnErr) {
     console.error("❌ [입력] 버튼을 찾을 수 없습니다.");

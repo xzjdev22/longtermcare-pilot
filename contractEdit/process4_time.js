@@ -46,6 +46,9 @@ async function typeInCell(page, frame, selector, value, label) {
   return false;
 }
 
+/**
+ * 서비스 시간을 입력하고, 입력된 시간 데이터를 반환합니다.
+ */
 async function inputServiceTime(page, ask) {
   console.log("📂 [process4_time.js] 서비스 시간 입력을 시작합니다...");
 
@@ -69,8 +72,10 @@ async function inputServiceTime(page, ask) {
     }
   }
 
-  if (!workFrame)
-    return console.error("❌ 하단 그리드 프레임을 찾을 수 없습니다.");
+  if (!workFrame) {
+    console.error("❌ 하단 그리드 프레임을 찾을 수 없습니다.");
+    return null;
+  }
 
   try {
     const startTimeSelector =
@@ -82,8 +87,12 @@ async function inputServiceTime(page, ask) {
     await typeInCell(page, workFrame, endTimeSelector, endTime, "종료시간");
 
     console.log(`✅ 시간 입력 완료: ${startTime} ~ ${endTime}`);
+
+    // [중요] index.js에서 사용할 수 있도록 시간 데이터를 반환합니다.
+    return { startTime, endTime };
   } catch (err) {
     console.error("❌ process4_time.js 실행 중 오류:", err.message);
+    return null;
   }
 }
 

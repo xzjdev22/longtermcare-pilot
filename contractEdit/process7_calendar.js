@@ -1,54 +1,64 @@
-const readline = require("readline");
-
 /**
- * [test7.js] 날짜별 체크박스 일괄 정밀 타격 + 최종 저장 승인 CLI
+ * [process7_calendar.js] 시간대별 날짜 체크박스 정밀 타격
  */
-async function selectServiceDays(page) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+async function selectServiceDays(page, ask, timeLabel) {
+  // timeLabel 예: "09:00 ~ 10:00" -> 여기서 시작 시간인 "09:00"만 추출
+  const startTime = timeLabel.split("~")[0].trim();
 
-  const ask = (q) => new Promise((res) => rl.question(q, res));
+  // [1] 화면에서 해당 시작 시간이 적힌 셀을 찾아 행(Row) 번호 알아내기
+  // 넥사크로 특성상 text가 포함된 div를 찾고 그 부모의 id에서 gridrow_n을 추출합니다.
+  const rowInfo = await page.evaluate((time) => {
+    const cells = Array.from(document.querySelectorAll("div.nexacontentsbox"));
+    const targetCell = cells.find((c) => c.innerText.includes(time));
+    if (!targetCell) return null;
 
-  // [1] 날짜 입력 받기
-  const input = await ask(
-    "\n📅 체크할 날짜들을 입력하세요 (공백 구분, 예: 4 11): "
-  );
+    // cell_2_5 같은 ID나 gridrow_2 같은 ID를 가진 조상 요소를 찾음
+    const rowElement = targetCell.closest('div[id*="gridrow_"]');
+    if (!rowElement) return null;
+
+    const match = rowElement.id.match(/gridrow_(\d+)/);
+    return match ? match[1] : null;
+  }, startTime);
+
+  if (!rowInfo) {
+    console.log(
+      `❌ [${timeLabel}] 해당 시간대의 행을 화면에서 찾을 수 없습니다.`
+    );
+    return;
+  }
+
+  const currentRow = rowInfo;
+  console.log(`\n-------------------------------------------`);
+  console.log(`📅 [${timeLabel}] 설정 (매칭된 행: gridrow_${currentRow})`);
+  console.log(`-------------------------------------------`);
+
+  const input = await ask(`👉 체크할 날짜들을 입력하세요: `);
   const targetDays = input
+    .trim()
     .split(/\s+/)
     .map(Number)
     .filter((d) => d > 0 && d <= 31);
 
-  if (targetDays.length === 0) {
-    console.log("⏩ 날짜 입력이 없어 종료합니다.");
-    rl.close();
-    return;
-  }
+  if (targetDays.length === 0) return;
 
-  console.log(`🚀 [${targetDays.join(", ")}] 일괄 클릭 프로세스 시작...`);
-  console.log("-------------------------------------------");
-
-  // [2] 날짜 루프: 중단 없이 모든 날짜 클릭 시도
+  // [2] 날짜 루프: 찾아낸 currentRow 번호를 사용하여 정밀 타격
   for (const day of targetDays) {
     const cellIndex = 11 + day;
-    const iconSelector = `div[id$="cell_1_${cellIndex}"] .cellcheckbox .nexacontentsbox`;
+    const iconSelector = `div[id$="gridrow_${currentRow}"] div[id*="cell_${currentRow}_${cellIndex}"] .cellcheckbox .nexacontentsbox`;
 
     try {
       const icon = await page.waitForSelector(iconSelector, { timeout: 2000 });
-
       if (icon) {
         const box = await icon.boundingBox();
         if (box) {
-          // 정밀 마우스 클릭
+          // [기존 정밀 클릭 로직 100% 유지]
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
           await page.mouse.down();
           await new Promise((r) => setTimeout(r, 100));
           await page.mouse.up();
 
-          await new Promise((r) => setTimeout(r, 600)); // 반영 대기
+          await new Promise((r) => setTimeout(r, 800)); // 반영 대기
 
-          // 상태 확인 로그만 출력
           const isChecked = await icon.evaluate((el) =>
             el.style.backgroundImage.includes("bg_check_S.png")
           );
@@ -56,37 +66,16 @@ async function selectServiceDays(page) {
           if (isChecked) {
             console.log(`✅ [${day}일] 클릭 성공 및 체크 확인`);
           } else {
-            console.log(
-              `⚠️ [${day}일] 클릭 수행됨 (화면에서 상태를 확인하세요)`
-            );
+            console.log(`⚠️ [${day}일] 클릭 수행됨 (화면 확인 필요)`);
           }
         }
       }
     } catch (e) {
       console.log(
-        `❌ [${day}일] 요소를 찾지 못했습니다. (Index: ${cellIndex})`
+        `❌ [${day}일] 요소를 찾지 못함 (Row: ${currentRow}, Index: ${cellIndex})`
       );
     }
   }
-
-  // [3] 모든 클릭 종료 후 최종 확인 CLI 🎯
-  console.log("-------------------------------------------");
-  console.log(`👀 위 로그와 화면을 확인해 주세요.`);
-  const finalConfirm = await ask(
-    `❓ 모든 날짜가 정상적으로 입력되었습니까? 저장하시겠습니까? (y/n): `
-  );
-  console.log("-------------------------------------------\n");
-
-  if (finalConfirm.toLowerCase() !== "y") {
-    console.log(
-      "🛑 사용자가 'n'을 선택했습니다. 저장 단계를 진행하지 않고 종료합니다."
-    );
-    rl.close();
-    process.exit(0); // 프로세스 종료 (test8로 가지 않음)
-  }
-
-  console.log("🚀 최종 승인 완료! 저장 및 통보(test8.js) 단계로 진입합니다.");
-  rl.close();
 }
 
 module.exports = { selectServiceDays };
