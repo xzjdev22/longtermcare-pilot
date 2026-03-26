@@ -51,8 +51,6 @@ async function inputServiceTime(page, ask) {
 
   // 시작 시간만 묻습니다.
   const startTime = await ask("▶ 시작 시간 입력 (예: 1100): ");
-
-  // 60분을 자동으로 더해 종료 시간을 계산합니다.
   const endTime = add60Minutes(startTime);
   console.log(`💡 서비스 60분 고정: 종료 시간 [${endTime}] 자동 계산됨`);
 
@@ -85,6 +83,7 @@ async function inputServiceTime(page, ask) {
   } catch (err) {
     console.error("❌ process4_time.js 실행 중 오류:", err.message);
   }
+  return { startTime, endTime }; // 입력된 시간 정보를 반환
 }
 
 module.exports = { inputServiceTime };

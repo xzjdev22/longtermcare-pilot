@@ -50,38 +50,56 @@ async function runContractEdit(page) {
     await clickSearchButton(page);
     await fillRegistrationDetails(page); // 이제 이 안에서는 조회까지만 수행합니다.
 
-    // [PHASE B] 상세 데이터 입력 및 구성 (루프 적용) 🔄
+    // ---------------------------------------------------------
+    // [PHASE B & C] 상세 데이터 입력 및 시간대별 날짜 확정 🔄
+    // ---------------------------------------------------------
     let addMore = true;
     while (addMore) {
       console.log("\n➕ 새로운 서비스 행 추가 및 데이터 작성을 시작합니다.");
 
-      // [추가] PHASE B의 시작점: [입력] 버튼을 클릭하여 새 행을 만듭니다.
-      await addNewRow(page);
+      await addNewRow(page); // Step 2.5: 행 추가
+      await selectMultiplePersons(page); // Step 3: 인원 선택
 
-      await selectMultiplePersons(page);
+      // Step 4: 시간 입력 (입력된 시간을 반환받도록 수정 필요)
+      const timeInfo = await inputServiceTime(page, ask);
+      const timeLabel = `${timeInfo.startTime} ~ ${timeInfo.endTime}`;
 
-      // utils에서 불러온 ask를 그대로 사용합니다.
-      await inputServiceTime(page, ask);
+      await selectComboItem(page); // Step 5: 방법 선택
+      await finalizeInput(page); // Step 6: 그리드 반영
 
-      await selectComboItem(page);
-      await finalizeInput(page);
+      // [변경 포인트] 입력 직후 해당 시간대의 날짜를 바로 묻습니다.
+      console.log(`\n📅 [${timeLabel}] 시간대에 적용할 날짜를 선택합니다.`);
+      console.log("DEBUG: page is", typeof page);
+      await selectServiceDays(page, ask, timeLabel); // Step 7: 날짜 선택 (시간대 정보 전달)
 
       console.log("\n-------------------------------------------");
-      const answer = await ask("❓ 추가로 입력할 시간대가 있습니까? (y/n): ");
+      const answer = await ask(
+        `❓ 추가로 입력할 시간대가 더 있습니까? (y/n): `
+      );
       if (answer.toLowerCase() !== "y") {
         addMore = false;
       }
       console.log("-------------------------------------------");
     }
 
-    // [PHASE C] 날짜 확정 및 최종 저장
-    // [중요] process7_calendar 내부에서도 utils/readline의 ask를 사용하도록 수정해야 합니다.
-    await selectServiceDays(page);
-    await finalizeRegistration(page);
+    // ---------------------------------------------------------
+    // [FINAL PHASE] 최종 검토 및 저장
+    // ---------------------------------------------------------
+    console.log(
+      "\n👀 모든 시간대와 날짜 입력이 완료되었습니다. 화면을 확인해 주세요."
+    );
+    const finalConfirm = await ask(
+      "❓ 모든 정보가 정상입니까? 최종 저장하시겠습니까? (y/n): "
+    );
 
-    console.log("\n====================================================");
-    console.log("🎊 [SUCCESS] 모든 비즈니스 프로세스가 정상 종료되었습니다.");
-    console.log("====================================================\n");
+    if (
+      finalConfirm.toLowerCase() === "y" ||
+      finalConfirm.toLowerCase() === "yy"
+    ) {
+      await finalizeRegistration(page); // Step 8: 최종 저장
+    } else {
+      console.log("\n🛑 사용자가 저장을 취소했습니다. 프로세스를 종료합니다.");
+    }
   } catch (error) {
     console.log("\n----------------------------------------------------");
     console.error(`❌ [CRITICAL ERROR] 프로세스 중단: ${error.message}`);
