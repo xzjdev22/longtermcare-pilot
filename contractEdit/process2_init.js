@@ -29,7 +29,7 @@ async function fillRegistrationDetails(page) {
 
   try {
     // [STEP 1] 년월 설정 (2026년 4월)
-    await selectComboByText(page, workFrame, "cmb_ctrYm", "2026년 4월");
+    await selectComboByText(page, workFrame, "cmb_ctrYm", "2026년 8월");
 
     // [STEP 2] 조회 버튼 클릭
     console.log("🔍 [조회] 버튼 클릭 시도...");
