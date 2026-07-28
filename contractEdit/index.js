@@ -11,6 +11,7 @@ const { selectComboItem } = require("./process5_method");
 const { finalizeInput } = require("./process6_grid");
 const { selectServiceDays } = require("./process7_calendar");
 const { finalizeRegistration } = require("./process8_finalize");
+const { Test } = require("./test");
 
 async function runContractEdit(page) {
   console.log("\n====================================================");
@@ -65,48 +66,48 @@ async function runContractEdit(page) {
         await clickSearchButton(page, person.name);
         await fillRegistrationDetails(page);
 
-        // [PHASE B & C] 시간대별 데이터 입력 루프
-        for (const slot of person.timeSlots) {
-          const timeLabel = `${slot.startTime} ~ ${slot.endTime}`;
-          console.log(`\n➕ [시간대 추가] ${timeLabel}`);
+        // // [PHASE B & C] 시간대별 데이터 입력 루프
+        // for (const slot of person.timeSlots) {
+        //   const timeLabel = `${slot.startTime} ~ ${slot.endTime}`;
+        //   console.log(`\n➕ [시간대 추가] ${timeLabel}`);
 
-          try {
-            await addNewRow(page);
-            await selectMultiplePersons(page);
+        //   try {
+        //     await addNewRow(page);
+        //     await selectMultiplePersons(page);
 
-            // 서비스 시간 입력 (시간 객체 전달)
-            await inputServiceTime(page, slot);
+        //     // 서비스 시간 입력 (시간 객체 전달)
+        //     await inputServiceTime(page, slot);
 
-            await selectComboItem(page);
-            await finalizeInput(page);
+        //     await selectComboItem(page);
+        //     await finalizeInput(page);
 
-            // 날짜 선택 (날짜 배열 전달)
-            console.log(
-              `\n📅 [${timeLabel}] 시간대에 적용할 날짜들을 선택합니다.`
-            );
-            await selectServiceDays(page, slot.dates, timeLabel);
+        //     // 날짜 선택 (날짜 배열 전달)
+        //     console.log(
+        //       `\n📅 [${timeLabel}] 시간대에 적용할 날짜들을 선택합니다.`
+        //     );
+        //     await selectServiceDays(page, slot.dates, timeLabel);
 
-            // 개별 성공 표기
-            slot.result = "SUCCESS";
-            slot.message = "정상 입력 완료";
-          } catch (slotErr) {
-            console.error(`❌ [시간대 오류] ${timeLabel}: ${slotErr.message}`);
-            slot.result = "FAILED";
-            slot.message = slotErr.message;
-          }
-        }
+        //     // 개별 성공 표기
+        //     slot.result = "SUCCESS";
+        //     slot.message = "정상 입력 완료";
+        //   } catch (slotErr) {
+        //     console.error(`❌ [시간대 오류] ${timeLabel}: ${slotErr.message}`);
+        //     slot.result = "FAILED";
+        //     slot.message = slotErr.message;
+        //   }
+        // }
 
-        // [FINAL PHASE] 저장 버튼 클릭 및 팝업 결과 수집
-        console.log(`\n💾 [${person.name}] 최종 저장 및 공단 전송 시도...`);
-        const finalizeResult = await finalizeRegistration(page);
+        // // [FINAL PHASE] 저장 버튼 클릭 및 팝업 결과 수집
+        // console.log(`\n💾 [${person.name}] 최종 저장 및 공단 전송 시도...`);
+        // const finalizeResult = await finalizeRegistration(page);
 
-        // 전체 팝업 결과 반영
-        for (const slot of person.timeSlots) {
-          if (slot.result === "SUCCESS") {
-            slot.result = finalizeResult.success ? "SUCCESS" : "FAILED";
-            slot.message = finalizeResult.message;
-          }
-        }
+        // // 전체 팝업 결과 반영
+        // for (const slot of person.timeSlots) {
+        //   if (slot.result === "SUCCESS") {
+        //     slot.result = finalizeResult.success ? "SUCCESS" : "FAILED";
+        //     slot.message = finalizeResult.message;
+        //   }
+        // }
       } catch (personErr) {
         console.error(
           `❌ [수급자 처리 오류] ${person.name}: ${personErr.message}`

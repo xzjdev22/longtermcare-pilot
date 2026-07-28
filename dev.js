@@ -18,6 +18,7 @@ const { selectComboItem } = require("./contractEdit/process5_method");
 const { finalizeInput } = require("./contractEdit/process6_grid");
 const { selectServiceDays } = require("./contractEdit/process7_calendar");
 const { finalizeRegistration } = require("./contractEdit/process8_finalize");
+const { Test } = require("./contractEdit/test");
 
 async function dev() {
   console.log("\n====================================================");
@@ -52,7 +53,7 @@ async function dev() {
     console.log("🧪단품 테스트를 시작합니다...");
 
     // 🎯 예: 저장(Finalize) 단계만 1초 만에 테스트
-    await finalizeRegistration(page);
+    await Test(page);
 
     // 필요시 다른 단계만 테스트하고 싶을 때 주석 풀고 사용:
     // await clickSearchButton(page, ask);
