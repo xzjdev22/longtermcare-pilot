@@ -13,7 +13,10 @@ async function main() {
 
     const browser = await puppeteer.launch({
       headless: false,
-      args: ["--window-size=1440,900"],
+      args: [
+        "--window-size=1440,900",
+        "--remote-debugging-port=9222", // 🎯 원격 디버깅 포트 오픈 (dev.js에서 재접속 가능)
+      ],
     });
 
     const page = await loginWithSession(browser, targetUrl);

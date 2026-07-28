@@ -11,9 +11,7 @@ async function clickSearchButton(page, ask) {
   console.log("-------------------------------------------\n");
 
   // 🎯 주입받은 ask 함수 사용
-  let targetName = await ask(
-    "👤 조회할 수급자 성함을 입력하세요 (기본값: 김금돌): "
-  );
+  let targetName = await ask("👤 조회할 수급자 성함을 입력하세요: ");
   if (!targetName.trim()) targetName = "김금돌";
 
   const frames = page.frames();
