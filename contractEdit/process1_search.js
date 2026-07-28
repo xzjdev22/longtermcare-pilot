@@ -1,18 +1,20 @@
 const { smartClick } = require("../utils/click");
 
 /**
- * [Process 1] 수급자 검색 및 상세 등록 화면 진입
+ * [Process 1] 수급자 검색 및 상세 등록 화면 진입 (자동화 버전)
  * @param {object} page - Puppeteer page
- * @param {function} ask - index에서 주입받은 공통 질문 함수 🎯
+ * @param {string} targetName - 검색할 수급자 성함 🎯
  */
-async function clickSearchButton(page, ask) {
+async function clickSearchButton(page, targetName) {
   console.log("\n-------------------------------------------");
-  console.log("🔍 [process1_search.js] 검색 및 등록 프로세스 시작");
+  console.log(
+    `🔍 [process1_search.js] 수급자 [${targetName}] 검색 및 등록 프로세스 시작`
+  );
   console.log("-------------------------------------------\n");
 
-  // 🎯 주입받은 ask 함수 사용
-  let targetName = await ask("👤 조회할 수급자 성함을 입력하세요: ");
-  if (!targetName.trim()) targetName = "김금돌";
+  if (!targetName) {
+    throw new Error("❌ 검색할 수급자명이 전달되지 않았습니다.");
+  }
 
   const frames = page.frames();
   let workFrame = null;
@@ -28,8 +30,7 @@ async function clickSearchButton(page, ask) {
   }
 
   if (!workFrame) {
-    console.error("❌ [process1_search.js] 작업 프레임을 찾을 수 없습니다.");
-    return;
+    throw new Error("❌ [process1_search.js] 작업 프레임을 찾을 수 없습니다.");
   }
 
   // [STEP 0] 유효 체크박스
@@ -83,6 +84,8 @@ async function clickSearchButton(page, ask) {
     const lastRow = allRows[allRows.length - 1];
     await smartClick(page, workFrame, lastRow);
     await new Promise((r) => setTimeout(r, 1000));
+  } else {
+    throw new Error(`❌ 수급자 [${targetName}] 검색 결과가 없습니다.`);
   }
 
   // [STEP 5] 등록 버튼

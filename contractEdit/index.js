@@ -1,7 +1,7 @@
 /**
- * [index.js] 급여계약내용 등록 자동화 메인 컨트롤러 (수급자 루프 버전)
+ * [index.js] 급여계약내용 등록 자동화 메인 컨트롤러 (CSV 완전 자동화 버전)
  */
-const { ask, closeInterface } = require("../utils/readline");
+const { parseAndGroupCsv, saveResultLog } = require("../utils/csvHandler");
 const { smartClick } = require("../utils/click");
 const { clickSearchButton } = require("./process1_search");
 const { fillRegistrationDetails } = require("./process2_init");
@@ -14,8 +14,16 @@ const { finalizeRegistration } = require("./process8_finalize");
 
 async function runContractEdit(page) {
   console.log("\n====================================================");
-  console.log("🚀 [Longterm-Bot] 비즈니스 로직 자동화 공정 시작");
+  console.log("🚀 [Longterm-Bot] CSV 데이터 기반 비즈니스 로직 자동화 시작");
   console.log("====================================================");
+
+  const csvInputPath =
+    "data/google_calendar_export - Google_Calendar_Export.csv";
+  const csvOutputPath = "data/google_calendar_export_result.csv";
+
+  // 1. CSV 파싱 및 수급자별 그룹화
+  const processedData = parseAndGroupCsv(csvInputPath);
+  console.log(`📊 총 ${processedData.length}명의 수급자 데이터 로드 완료.\n`);
 
   try {
     // [GATEWAY] 메뉴 진입 로직 (프로그램 시작 시 딱 한 번만 수행)
@@ -45,83 +53,79 @@ async function runContractEdit(page) {
     await new Promise((r) => setTimeout(r, 3000));
 
     // ---------------------------------------------------------
-    // 🔄 [MASTER LOOP] 수급자 단위 무한 반복 시작
+    // 🔄 [MASTER LOOP] 수급자 단위 자동 루프
     // ---------------------------------------------------------
-    let continueOverall = true;
-    while (continueOverall) {
-      // [PHASE A] 기초 조회 (🎯 중요: ask 함수를 인자로 넘겨줍니다)
-      await clickSearchButton(page, ask);
+    for (const person of processedData) {
+      console.log(`\n====================================================`);
+      console.log(`👤 [수급자] ${person.name} 자동 처리 시작`);
+      console.log(`====================================================`);
 
-      // 상세창 진입 후 기초 설정
-      await fillRegistrationDetails(page);
+      try {
+        // [PHASE A] 기초 조회
+        await clickSearchButton(page, person.name);
+        await fillRegistrationDetails(page);
 
-      // [PHASE B & C] 시간대별 데이터 입력 루프
-      let addMoreTime = true;
-      while (addMoreTime) {
-        console.log("\n➕ 새로운 서비스 행 추가 및 데이터 작성을 시작합니다.");
+        // [PHASE B & C] 시간대별 데이터 입력 루프
+        for (const slot of person.timeSlots) {
+          const timeLabel = `${slot.startTime} ~ ${slot.endTime}`;
+          console.log(`\n➕ [시간대 추가] ${timeLabel}`);
 
-        await addNewRow(page);
-        await selectMultiplePersons(page);
+          try {
+            await addNewRow(page);
+            await selectMultiplePersons(page);
 
-        // 서비스 시간 입력 (ask 유틸 전달)
-        const timeInfo = await inputServiceTime(page, ask);
-        const timeLabel = `${timeInfo.startTime} ~ ${timeInfo.endTime}`;
+            // 서비스 시간 입력 (시간 객체 전달)
+            await inputServiceTime(page, slot);
 
-        await selectComboItem(page);
-        await finalizeInput(page);
+            await selectComboItem(page);
+            await finalizeInput(page);
 
-        // 날짜 선택 (ask 유틸 전달)
-        console.log(`\n📅 [${timeLabel}] 시간대에 적용할 날짜를 선택합니다.`);
-        await selectServiceDays(page, ask, timeLabel);
+            // 날짜 선택 (날짜 배열 전달)
+            console.log(
+              `\n📅 [${timeLabel}] 시간대에 적용할 날짜들을 선택합니다.`
+            );
+            await selectServiceDays(page, slot.dates, timeLabel);
 
-        console.log("\n-------------------------------------------");
-        const answer = await ask(
-          `❓ 추가로 입력할 시간대가 더 있습니까? (y/n): `
-        );
-        if (answer.toLowerCase() !== "y") {
-          addMoreTime = false;
+            // 개별 성공 표기
+            slot.result = "SUCCESS";
+            slot.message = "정상 입력 완료";
+          } catch (slotErr) {
+            console.error(`❌ [시간대 오류] ${timeLabel}: ${slotErr.message}`);
+            slot.result = "FAILED";
+            slot.message = slotErr.message;
+          }
         }
-        console.log("-------------------------------------------");
-      }
 
-      // [FINAL PHASE] 최종 검토 및 저장
-      console.log(
-        "\n👀 모든 시간대와 날짜 입력이 완료되었습니다. 화면을 확인해 주세요."
-      );
-      const finalConfirm = await ask(
-        "❓ 모든 정보가 정상입니까? 최종 저장하시겠습니까? (y/n): "
-      );
+        // [FINAL PHASE] 저장 버튼 클릭 및 팝업 결과 수집
+        console.log(`\n💾 [${person.name}] 최종 저장 및 공단 전송 시도...`);
+        const finalizeResult = await finalizeRegistration(page);
 
-      if (
-        finalConfirm.toLowerCase() === "y" ||
-        finalConfirm.toLowerCase() === "yy"
-      ) {
-        await finalizeRegistration(page);
-      } else {
-        console.log("\n🛑 사용자가 저장을 취소했습니다.");
+        // 전체 팝업 결과 반영
+        for (const slot of person.timeSlots) {
+          if (slot.result === "SUCCESS") {
+            slot.result = finalizeResult.success ? "SUCCESS" : "FAILED";
+            slot.message = finalizeResult.message;
+          }
+        }
+      } catch (personErr) {
+        console.error(
+          `❌ [수급자 처리 오류] ${person.name}: ${personErr.message}`
+        );
+        for (const slot of person.timeSlots) {
+          slot.result = "FAILED";
+          slot.message = personErr.message;
+        }
       }
-
-      // 🎯 한 명의 처리가 끝난 후 루프 지속 여부 확인
-      console.log("\n====================================================");
-      const nextPerson = await ask(
-        "🔄 다음 수급자를 처리하시겠습니까? (y/n): "
-      );
-      if (nextPerson.toLowerCase() !== "y") {
-        continueOverall = false;
-        console.log("👋 모든 작업을 마치고 프로그램을 종료합니다.");
-      } else {
-        console.log("🆕 메인 화면에서 다음 조회를 준비합니다...");
-        // Tip: finalizeRegistration에서 팝업 확인 후 상세창이 닫혔으므로 바로 재조회 가능
-      }
-      console.log("====================================================\n");
     }
+
+    console.log("\n🏁 모든 수급자 데이터 처리가 완료되었습니다.");
   } catch (error) {
     console.log("\n----------------------------------------------------");
     console.error(`❌ [CRITICAL ERROR] 프로세스 중단: ${error.message}`);
     console.log("----------------------------------------------------\n");
   } finally {
-    // 모든 루프가 완전히 종료되었을 때만 인터페이스를 닫습니다.
-    closeInterface();
+    // 🎯 최종 결과 로그 CSV 파일 생성
+    saveResultLog(csvOutputPath, processedData);
   }
 }
 

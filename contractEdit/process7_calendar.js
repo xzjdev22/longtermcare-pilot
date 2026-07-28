@@ -1,33 +1,44 @@
 /**
  * [process7_calendar.js]
- * 성공했던 test7.js의 정밀 타격 로직을 시간대별 루프에 이식
+ * CSV 기반 달력 날짜 클릭 자동화 모듈
  */
-async function selectServiceDays(page, ask, timeLabel) {
-  try {
-    const input = await ask(
-      `📅 [${timeLabel}] 적용할 날짜들을 입력하세요 (공백 구분): `
-    );
-    if (!input) return;
-    const daysArray = input.split(/\s+/).filter((d) => d.trim() !== "");
 
-    const searchTime = timeLabel.split("~")[0].trim();
+/**
+ * 특정 시간대(timeLabel)에 해당하는 그리드 행을 찾아서 날짜(daysArray)를 체크합니다.
+ * @param {object} page - Puppeteer page
+ * @param {string} timeLabel - 시간대 문자열 (예: "0840~0940" 또는 "08:40~09:40")
+ * @param {Array<number|string>} daysArray - 클릭할 일자 배열 (예: [1, 2, 5, 12] 또는 ["1", "2"])
+ */
+async function selectServiceDays(page, timeLabel, daysArray) {
+  try {
+    if (!daysArray || !Array.isArray(daysArray) || daysArray.length === 0) {
+      console.log(`⚠️ [Phase C] [${timeLabel}] 클릭할 날짜 데이터가 없습니다.`);
+      return;
+    }
+
+    // HHMM 또는 HH:MM 형태에서 시작 시간 추출 후 HH:MM 형태로 표준화
+    const searchTime = timeLabel.split("~")[0].replace(/[^0-9]/g, "");
     const formattedTime = `${searchTime.substring(0, 2)}:${searchTime.substring(
       2,
       4
     )}`;
 
-    console.log(`🔎 [Phase C] 그리드에서 [${formattedTime}] 행 탐색 중...`);
+    console.log(
+      `🔎 [Phase C] 그리드에서 [${formattedTime}] 행 탐색 중... (적용 날짜: ${daysArray.join(
+        ", "
+      )}일)`
+    );
 
     let rowIdx = null;
     let targetFrame = page;
 
-    // 1. 모든 프레임을 뒤져서 해당 시간이 있는 행(rowIdx) 찾기
+    // 1. 모든 프레임을 검색하여 해당 시간(formattedTime)이 위치한 행(rowIdx) 찾기
     for (const frame of page.frames()) {
       const foundRow = await frame.evaluate((time) => {
         const cells = Array.from(
           document.querySelectorAll('div[id*=".cell_"]')
         );
-        // 시간 셀은 보통 끝이 _5로 끝남
+        // 시간 셀은 주로 _5로 끝남
         const target = cells.find(
           (c) => c.id.endsWith("_5") && c.innerText.includes(time)
         );
@@ -45,16 +56,19 @@ async function selectServiceDays(page, ask, timeLabel) {
       }
     }
 
-    if (rowIdx === null)
-      throw new Error(`${formattedTime} 행을 찾지 못했습니다.`);
+    if (rowIdx === null) {
+      throw new Error(`그리드에서 [${formattedTime}] 행을 찾지 못했습니다.`);
+    }
     console.log(`🎯 [Phase C] 매칭된 행: gridrow_${rowIdx} (프레임 확인 완료)`);
 
-    // 2. 날짜 클릭 루프 (성공했던 test7.js 로직 적용)
+    // 2. 날짜 클릭 루프 (검증된 test7.js 정밀 클릭 적용)
     for (const day of daysArray) {
-      const dayNum = parseInt(day);
+      const dayNum = parseInt(day, 10);
+      if (isNaN(dayNum)) continue;
+
       const cellIdx = 11 + dayNum;
 
-      // 성공했던 Selector 패턴: 특정 row의 특정 cell 내부 checkbox icon
+      // 특정 row의 특정 cell 내부 checkbox icon selector
       const iconSelector = `div[id$="gridrow_${rowIdx}.cell_${rowIdx}_${cellIdx}"] .cellcheckbox .nexacontentsbox`;
 
       try {
@@ -65,7 +79,7 @@ async function selectServiceDays(page, ask, timeLabel) {
         if (icon) {
           const box = await icon.boundingBox();
           if (box) {
-            // [성공 로직] 정밀 마우스 이동 및 누르기(down/up)
+            // [정밀 타격] 마우스 이동 및 down/up
             await page.mouse.move(
               box.x + box.width / 2,
               box.y + box.height / 2
@@ -74,10 +88,10 @@ async function selectServiceDays(page, ask, timeLabel) {
             await new Promise((r) => setTimeout(r, 100));
             await page.mouse.up();
 
-            // 반영 대기 (성공 로직의 600ms 유지)
+            // 반영 대기
             await new Promise((r) => setTimeout(r, 600));
 
-            // [성공 로직] 이미지 경로를 통한 체크 상태 확인
+            // 이미지 경로를 통한 체크 상태 최종 확인
             const isChecked = await icon.evaluate((el) =>
               window
                 .getComputedStyle(el)
@@ -85,21 +99,21 @@ async function selectServiceDays(page, ask, timeLabel) {
             );
 
             if (isChecked) {
-              console.log(`  ✅ [${day}일] 클릭 성공 및 체크 확인`);
+              console.log(`  ✅ [${dayNum}일] 클릭 성공 및 체크 확인`);
             } else {
-              // 가끔 backgroundImage가 즉시 안 바뀔 수 있으므로 일단 수행 로그 출력
-              console.log(`  ⚠️ [${day}일] 클릭 수행됨 (화면 확인 필요)`);
+              console.log(`  ⚠️ [${dayNum}일] 클릭 수행됨 (체크 상태 미확인)`);
             }
           }
         }
       } catch (e) {
         console.error(
-          `  ❌ [${day}일] 요소를 찾지 못함 (Selector: ${iconSelector})`
+          `  ❌ [${dayNum}일] 요소를 찾지 못함 (Selector: ${iconSelector})`
         );
       }
     }
   } catch (err) {
     console.error(`❌ [Phase C] 날짜 선택 오류: ${err.message}`);
+    throw err;
   }
 }
 

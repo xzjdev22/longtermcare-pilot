@@ -1,0 +1,10 @@
+Subject,Start Date,Start Time,End Date,End Time,Is Recurring,Description,Result,Message
+강숙자,2026-08-07,08:40,2026-08-07,09:40,No,"",FAILED,"변경내역이 없습니다.
+"
+강숙자,2026-08-14,08:40,2026-08-14,09:40,No,"",FAILED,"변경내역이 없습니다.
+"
+김옥임,2026-08-06,09:50,2026-08-06,10:50,No,"",FAILED,"Attempted to use detached Frame 'D3CA1B9FE8C1E15FA23295589F029D5F'."
+김옥임,2026-08-20,09:50,2026-08-20,10:50,No,"",FAILED,"Attempted to use detached Frame 'D3CA1B9FE8C1E15FA23295589F029D5F'."
+김옥임,2026-08-13,12:15,2026-08-13,13:15,No,"",FAILED,"❌ [행 추가] 메인 작업 프레임을 찾을 수 없습니다."
+조임분,2026-08-24,08:10,2026-08-24,09:10,No,"[목욕(60분)] 60분이상(차량이용차량내)",FAILED,"❌ [process1_search.js] 작업 프레임을 찾을 수 없습니다."
+조임분,2026-08-31,08:10,2026-08-31,09:10,No,"",FAILED,"❌ [process1_search.js] 작업 프레임을 찾을 수 없습니다."
