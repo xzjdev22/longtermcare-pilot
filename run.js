@@ -3,6 +3,7 @@ const inquirer = require("inquirer");
 const config = require("./config.json");
 const { loginWithSession } = require("./login");
 const { runContractEdit } = require("./contractEdit");
+const { runManualContractEdit } = require("./contractEditManual");
 
 const prompt = inquirer.createPromptModule();
 
@@ -26,13 +27,22 @@ async function main() {
         type: "list",
         name: "action",
         message: "📂 작업을 선택하세요:",
-        choices: [{ name: "1. 급여계약내용 등록변경해지", value: "contract" }],
+        choices: [
+          { name: "1. 급여계약내용 등록변경해지", value: "contract" },
+          {
+            name: "2. (수동)급여계약내용 등록변경해지",
+            value: "manual_contract",
+          },
+        ],
       },
     ]);
 
     if (action === "contract") {
       await runContractEdit(page);
+    } else if (action === "manual_contract") {
+      await runManualContractEdit(page);
     }
+
     console.log(
       "\n🏁 [Longterm-Bot] 모든 자동화 프로세스가 최종 종료되었습니다."
     );
