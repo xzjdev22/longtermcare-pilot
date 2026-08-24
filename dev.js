@@ -9,6 +9,7 @@
 const puppeteer = require("puppeteer");
 const { ask, closeInterface } = require("./utils/readline");
 const { runManualContractEdit } = require("./contractEditManual");
+const { runListContractDate } = require("./listContractDate");
 
 // 🎯 단품 테스트할 모듈들을 불러옵니다.
 const { clickSearchButton } = require("./contractEdit/process1_search");
@@ -55,7 +56,7 @@ async function dev() {
 
     // 🎯 예: 저장(Finalize) 단계만 1초 만에 테스트
     // await Test(page);
-    await runManualContractEdit(page);
+    await runListContractDate(page);
 
     // 필요시 다른 단계만 테스트하고 싶을 때 주석 풀고 사용:
     // await clickSearchButton(page, ask);
