@@ -333,10 +333,9 @@ function runCareforPipeline(ss, currentActiveSheet) {
         }
 
         const planEndDateStr = recipientResult.planEndDate.text;
-        const isAfterPrevMonthPlanEndDate =
+        const isAfterPrevMonthFirstDay =
           hasPreviousMonthFirstDayPassed(planEndDateStr);
 
-        // 표준약관 작성일자(contractDate) 처리
         let prevYearContractEnd =
           prevYearRecipientData?.contractEndDate?.text ?? "";
 
@@ -364,7 +363,8 @@ function runCareforPipeline(ss, currentActiveSheet) {
             link: "",
           };
         } else {
-          if (isAfterPrevMonthPlanEndDate) {
+          console.log(name, { isAfterPrevMonthFirstDay });
+          if (isAfterPrevMonthFirstDay) {
             const fileKey = `${name}_표준약관`;
             const driveFile =
               driveFileMap.get(fileKey) ||
@@ -392,14 +392,13 @@ function runCareforPipeline(ss, currentActiveSheet) {
           }
         }
 
-        // 기초평가 처리
         const processEvalCell = (colIdx, isShortFormat = false, yearType) => {
           const val = row[colIdx];
           const parsedVal = parseDateString(val);
           let isDueMonth = false;
           switch (yearType) {
             case "YEAR":
-              isDueMonth = isAfterPrevMonthPlanEndDate;
+              isDueMonth = isAfterPrevMonthFirstDay;
               break;
 
             case "UPPER":
@@ -442,7 +441,6 @@ function runCareforPipeline(ss, currentActiveSheet) {
         recipientResult.cognitionLower = processEvalCell(9, true, "LOWER");
         ((recipientResult.desireEval = processEvalCell(10, true)), "YEAR");
 
-        // 급여계약 작성일자(planWriteDate) 처리
         const rawPlanText = row[11]?.toString().trim() ?? "";
         const matchPublic = rawPlanText.match(
           /(\d{2,4}[.-]\d{1,2}[.-]\d{1,2})/,
@@ -455,7 +453,7 @@ function runCareforPipeline(ss, currentActiveSheet) {
         ) {
           recipientResult.planWriteDate = {
             text: "미작성",
-            color: isAfterPrevMonthPlanEndDate ? COLOR_NEGATIVE : COLOR_WHITE,
+            color: isAfterPrevMonthFirstDay ? COLOR_NEGATIVE : COLOR_WHITE,
             link: "",
           };
         } else if (rawPlanText.includes("계약해지")) {
@@ -502,7 +500,7 @@ function runCareforPipeline(ss, currentActiveSheet) {
           color: recipientResult.planWriteDate.color,
         };
 
-        if (!isAfterPrevMonthPlanEndDate) {
+        if (!isAfterPrevMonthFirstDay) {
           if (prevRecipientData?.resultEvalDate) {
             const cleanResDate =
               parseDateString(prevRecipientData.resultEvalDate.text) ||

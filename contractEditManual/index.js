@@ -22,7 +22,7 @@ async function addNewRow(page) {
   const frames = page.frames();
   let workFrame = frames.find(
     (f) =>
-      f.name().includes("framesetWork") || f.name().includes("winNPA03020000")
+      f.name().includes("framesetWork") || f.name().includes("winNPA03020000"),
   );
 
   if (!workFrame) {
@@ -254,12 +254,12 @@ async function runManualContractEdit(page) {
   const csvPath = path.join(
     process.cwd(),
     "data",
-    "google_calendar_export - Google_Calendar_Export.csv"
+    "Google_Calendar_Export.csv",
   );
   const resultCsvPath = path.join(
     process.cwd(),
     "data",
-    "google_calendar_export_result.csv"
+    "google_calendar_export_result.csv",
   );
 
   let headers = [];
@@ -296,7 +296,7 @@ async function runManualContractEdit(page) {
 
     // 1. 입력 진행 여부 확인 (엔터 입력 시 기본값 Y)
     const confirmInput = await askConfirmInteractive(
-      `[${g.subject} | ${g.startTime} | ${daysStr}] 항목을 화면에 입력하시겠습니까?`
+      `[${g.subject} | ${g.startTime} | ${daysStr}] 항목을 화면에 입력하시겠습니까?`,
     );
 
     if (!confirmInput) {
@@ -323,7 +323,7 @@ async function runManualContractEdit(page) {
 
       // 2. 저장 결과 수동 확인 (엔터 입력 시 기본값 Y)
       const confirmSuccess = await askConfirmInteractive(
-        `해당 데이터(${g.subject} | ${timeLabel})가 성공적으로 저장되었습니까?`
+        `해당 데이터(${g.subject} | ${timeLabel})가 성공적으로 저장되었습니까?`,
       );
 
       if (confirmSuccess) {
