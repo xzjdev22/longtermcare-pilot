@@ -1,5 +1,5 @@
 /**
- * extractGridDataToCSV.js (최초 원본 기반 + 요청사항 반영)
+ * extractGridDataToCSV.js (Puppeteer 키보드/휠 이벤트 기반 스크롤 수집)
  */
 const fs = require("fs");
 const path = require("path");
@@ -30,85 +30,134 @@ async function runListContractDate(
   gridId = "grd_pofPlnppList",
   outputFileName = "nexa_grid_export.csv",
 ) {
-  console.log(`🔍 [CSV 추출] 그리드(${gridId}) 데이터 파싱 시작...`);
+  console.log(
+    `🔍 [CSV 추출] 그리드(${gridId}) 이벤트 기반 스크롤 전수 추출 시작...`,
+  );
 
   const targetContext = await findWorkFrame(page);
 
-  const rawData = await targetContext.evaluate((targetGridId) => {
+  // 1. 헤더 먼저 추출
+  const headers = await targetContext.evaluate((targetGridId) => {
     const gridRoot = document.querySelector(`[id*="${targetGridId}"]`);
-    if (!gridRoot) return { error: "그리드를 찾을 수 없습니다." };
+    if (!gridRoot) return [];
 
-    // 1. 헤더 추출: 이미 있는 이름이거나 빈 문자열이면 건너뛰기
     const headCells = Array.from(
       gridRoot.querySelectorAll('.head [id*="cell_-1_"]'),
     );
-    const headers = [];
-
+    const hdrs = [];
     headCells.forEach((cell) => {
       const textDiv = cell.querySelector('[id*=":text"]');
       let text = (textDiv ? textDiv.innerText : cell.innerText)
         .trim()
         .replace(/\s+/g, " ");
-
-      // 빈 문자열이 아니고, 기존 headers에 없는 경우에만 추가 (중복 및 빈값 차단)
-      if (text && !headers.includes(text)) {
-        headers.push(text);
+      if (text && !hdrs.includes(text)) {
+        hdrs.push(text);
       }
     });
-
-    // 2. 바디(데이터) 행 추출
-    const bodyCells = gridRoot.querySelectorAll(
-      '.body [id*="cell_"], .GridBandControl.body [id*="cell_"]',
-    );
-    const rowMap = {};
-
-    bodyCells.forEach((cell) => {
-      const idMatch = cell.id.match(/cell_(\d+)_(\d+)/);
-      if (idMatch) {
-        const rowIndex = idMatch[1];
-        const colIndex = parseInt(idMatch[2], 10);
-        if (!rowMap[rowIndex]) rowMap[rowIndex] = [];
-
-        const textDiv = cell.querySelector('[id*=":text"]');
-        let text = textDiv ? textDiv.innerText : cell.innerText;
-        rowMap[rowIndex][colIndex] = text
-          ? text.trim().replace(/\s+/g, " ")
-          : "";
-      }
-    });
-
-    // 3. 데이터 정렬 및 열 당기기 (B열 제외하고 C열부터 한 칸씩 앞으로 당김)
-    const sortedRowIndices = Object.keys(rowMap).sort(
-      (a, b) => Number(a) - Number(b),
-    );
-    const rows = sortedRowIndices.map((idx) => {
-      const rawRow = rowMap[idx];
-      const shiftedRow = [];
-
-      // rawRow[0] = A열(NO) 그대로 둠
-      // rawRow[1] = B열(빈값)은 건너뜀
-      // rawRow[2]부터 끝까지를 앞으로 한 칸씩 당김 (C열 -> B열 위치로)
-      for (let i = 0; i < rawRow.length; i++) {
-        if (i === 1) continue; // B열 스킵
-        shiftedRow.push(rawRow[i] !== undefined ? rawRow[i] : "");
-      }
-
-      return shiftedRow;
-    });
-
-    return { headers, rows };
+    return hdrs;
   }, gridId);
 
-  if (rawData.error) throw new Error(rawData.error);
+  if (headers.length === 0) {
+    throw new Error("그리드 헤더를 찾을 수 없습니다.");
+  }
 
-  // 4. CSV 포맷 생성 및 저장
+  // 2. 그리드 엘리먼트 핸들 확보 (키보드/마우스 인터랙션용)
+  const gridHandle = await targetContext.$(`[id*="${gridId}"]`);
+  if (gridHandle) {
+    await gridHandle.click(); // 그리드 포커스
+  }
+
+  let previousRowCount = 0;
+  let stagnantCount = 0;
+  const rowMap = {};
+
+  // 3. 스크롤을 내리며 누적 수집
+  for (let step = 0; step < 50; step++) {
+    const currentBatch = await targetContext.evaluate((targetGridId) => {
+      const gridRoot = document.querySelector(`[id*="${targetGridId}"]`);
+      if (!gridRoot) return {};
+
+      const bodyCells = gridRoot.querySelectorAll(
+        '.body [id*="cell_"], .GridBandControl.body [id*="cell_"]',
+      );
+      const batchMap = {};
+
+      bodyCells.forEach((cell) => {
+        const idMatch = cell.id.match(/cell_(\d+)_(\d+)/);
+        if (idMatch) {
+          const rowIndex = idMatch[1];
+          const colIndex = parseInt(idMatch[2], 10);
+          if (!batchMap[rowIndex]) batchMap[rowIndex] = [];
+
+          const textDiv = cell.querySelector('[id*=":text"]');
+          let text = textDiv ? textDiv.innerText : cell.innerText;
+          batchMap[rowIndex][colIndex] = text
+            ? text.trim().replace(/\s+/g, " ")
+            : "";
+        }
+      });
+      return batchMap;
+    }, gridId);
+
+    let newRowsAdded = false;
+    for (const [rowIndex, cols] of Object.entries(currentBatch)) {
+      if (!rowMap[rowIndex]) {
+        rowMap[rowIndex] = cols;
+        newRowsAdded = true;
+      }
+    }
+
+    const currentRowCount = Object.keys(rowMap).length;
+    if (currentRowCount === previousRowCount) {
+      stagnantCount++;
+      if (stagnantCount >= 3) {
+        break; // 더 이상 새로운 행이 로드되지 않음
+      }
+    } else {
+      stagnantCount = 0;
+      previousRowCount = currentRowCount;
+    }
+
+    // 넥사크로 가상 스크롤을 강제로 반응시키기 위해 Wheel 이벤트 및 PageDown 동시 실행
+    await targetContext.evaluate((targetGridId) => {
+      const gridRoot = document.querySelector(`[id*="${targetGridId}"]`);
+      if (gridRoot) {
+        const wheelEvent = new WheelEvent("wheel", {
+          deltaY: 500,
+          bubbles: true,
+          cancelable: true,
+        });
+        gridRoot.dispatchEvent(wheelEvent);
+      }
+    }, gridId);
+
+    // Puppeteer 키보드 PageDown 입력
+    await page.keyboard.press("PageDown");
+    await new Promise((r) => setTimeout(r, 300)); // 렌더링 대기
+  }
+
+  // 4. 데이터 정렬 및 B열(인덱스 1) 제외 처리
+  const sortedRowIndices = Object.keys(rowMap).sort(
+    (a, b) => Number(a) - Number(b),
+  );
+
+  const rows = sortedRowIndices.map((idx) => {
+    const rawRow = rowMap[idx];
+    const shiftedRow = [];
+    for (let i = 0; i < rawRow.length; i++) {
+      if (i === 1) continue; // B열 스킵
+      shiftedRow.push(rawRow[i] !== undefined ? rawRow[i] : "");
+    }
+    return shiftedRow;
+  });
+
+  // 5. CSV 포맷 생성 및 저장
   let csvContent = "\uFEFF";
   csvContent +=
-    rawData.headers.map((h) => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
+    headers.map((h) => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
 
-  rawData.rows.forEach((row) => {
-    // 헤더 개수와 컬럼 개수 맞추기
-    const lineData = rawData.headers.map((_, i) => {
+  rows.forEach((row) => {
+    const lineData = headers.map((_, i) => {
       const val = row[i] || "";
       return `"${val.toString().replace(/"/g, '""')}"`;
     });
@@ -121,7 +170,7 @@ async function runListContractDate(
   fs.writeFileSync(outputPath, csvContent, "utf-8");
 
   console.log(
-    `✅ [CSV 추출 완료] 저장 경로: ${outputPath} (총 ${rawData.rows.length}개 행 수집)`,
+    `✅ [CSV 추출 완료] 저장 경로: ${outputPath} (총 ${rows.length}개 행 수집)`,
   );
   return outputPath;
 }
