@@ -12,3 +12,6 @@ npm-debug.log*
 # Environment / Credentials
 .env
 config.js
+data/google_calendar_export_result.csv
+data/Google_Calendar_Export.csv
+data/nexa_grid_export.csv
